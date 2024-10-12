@@ -30,7 +30,7 @@
 
 
 
-![alt text](image-110.png)
+![alt text](images/image-110.png)
 
 Broadcast get sent out to everybody in a local network
 Routers separate broadcast domains

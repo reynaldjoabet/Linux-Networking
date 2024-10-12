@@ -23,7 +23,7 @@ Traffic arriving on a switch port assigned to one VLAN will only ever be forward
 
 When a frame arrives on a switchport in VLAN #10, it can only leave a switchport in VLAN #1
 
-![alt text](image-79.png)
+![alt text](images/image-79.png)
 
 If Host A were to send a frame with a destination MAC address of Host B, that frame would still only be flooded solely to the switch ports in VLAN #10. Even if a MAC address table entry for Host B existed associated to VLAN #30.In a way, it’s almost as if each VLAN maintains their own independent MAC address table
 
@@ -61,7 +61,7 @@ Since switch forwarding behavior is based on MAC addresses stored in the source 
 
 - For multicast and broadcast destinations, the switch will forward the frame to all active ports except the originating port.
 
-![alt text](image-80.png)
+![alt text](images/image-80.png)
 
 However, the switch now has the additional requirement of considering the VLAN of the destination node. if PC1 were to issue an ARP request, instead of simply forwarding this frame to every port, the switch determines that the frame originated on VLAN 1. The result is that only PC2 and the leftmost router interface (192.168.1.254) actually see the frame.
 
@@ -92,7 +92,7 @@ br0               1 PVID Egress Untagged
 
 Switch use the trunking protocol to modify the Ethernet frame by adding the VLAN id.
 
-![alt text](image-81.png)
+![alt text](images/image-81.png)
 
 When using IEEE 802.1Q, a 4-byte header is inserted in between the Ethernet and IP headers. Per the 802.1D standard, it is inserted 12 bytes into the frame immediately following the source MAC address. Therefore, frame is actually changed. So, the Ethernet type, which indicates the kind of encapsulated data, must also change. As an example, IP packets have an Ethertype value of 0800 but when running over a trunk it is changed to 8100 
 
@@ -107,7 +107,7 @@ The 802.1Q header is straightforward and includes the following fields:
 
 
 The VLAN header looks like:
-![alt text](image-83.png)
+![alt text](images/image-83.png)
 
 A VLAN, aka virtual LAN, separates broadcast domains by adding tags to network packets. VLANs allow network administrators to group hosts under the same switch or between different switches.
 
@@ -121,15 +121,15 @@ ip link add link eth0 name eth0.3 type vlan id 3
 
 This adds VLAN 2 with name eth0.2 and VLAN 3 with name eth0.3. The topology looks like this:
 
-![alt text](image-84.png)
+![alt text](images/image-84.png)
 
 
 VXLAN is an extension of a VLAN that allows network engineers to encapsulate layer 2 frames into layer 4 UDP packets
 
-![alt text](image-87.png)
+![alt text](images/image-87.png)
 
 
-![alt text](image-86.png)
+![alt text](images/image-86.png)
 
 `Preamble (8 bytes)`
 Alternating string of ones and zeros indicate to the receiving host that a frame is incoming.
@@ -155,7 +155,7 @@ The frame check sequence (FCS) is a four-octet cyclic redundancy check (CRC) tha
 
 What Cisco calls a Trunk port (i.e., a switch port that carries traffic for more than one VLAN), other vendors refer to as a Tagged port – referring to the addition of a VLAN tag to all traffic leaving such a port.
 
-![alt text](image-93.png)
+![alt text](images/image-93.png)
 
 same frame before and after it exits a Trunk port.
 
@@ -179,7 +179,7 @@ Each VLAN network is identified by a number often called tag. Network packages a
 
 VLAN filtering brings to Linux bridges the capabilities of a VLAN-aware network switch: each port on the bridge may be assigned to one or more VLANs, and traffic will only be allowed to flow between ports configured with the same VLANs. The VLANs may be tagged or untagged, and packets will have their VLAN id headers stripped or added as appropriate when they enter or leave the bridge.
 
-![alt text](image-96.png)
+![alt text](images/image-96.png)
 
 routing betweenn vlans is done by creating a vlan device ontop of the bridge
 
@@ -217,7 +217,7 @@ Ethernet broadcast packets (e.g. required for ARP) are not allowed to cross the 
 
 The flag “untagged” ensures that packets leaving the ports to the bridge’s outside first get stripped of any tags
 
-![alt text](image-97.png)
+![alt text](images/image-97.png)
 With `vlan_filtering` activated, the bridge filters outgoing packets according to target mac, packet tag and the vid of the target port
 
 
@@ -249,7 +249,7 @@ A packet transfer between L2-segments behind different NIC devices in one and th
 
 [more-fun-with-veth-network-namespaces-vlans-iv-l2-segments-same-ip-subnet-arp-and-routes](https://linux-blog.anracom.com/2024/02/29/more-fun-with-veth-network-namespaces-vlans-iv-l2-segments-same-ip-subnet-arp-and-routes/)
 
-![alt text](image-98.png)
+![alt text](images/image-98.png)
 
 request out through `veth1R` and in through `veth1R`
 
@@ -338,14 +338,14 @@ The transport protocol over a physical data center network is IP plus UDP. VXLAN
 
 A VXLAN packet is a MAC-in-UDP encapsulated packet. The layer 2 frame has a VXLAN header added to it and is placed in a UDP-IP packet. The VXLAN identifier is 24 bits. That is how a VXLAN can support 16 million segments.
 
-![alt text](image-100.png)
+![alt text](images/image-100.png)
 
 We have the VXLAN tunnel endpoints, VTEPs, on both hosts, and they are attached to the host’s bridge interfaces with the containers attached to the bridge. The VTEP performs data frame encapsulation and decapsulation. The VTEP peer interaction ensures that the data gets forwarded to the relevant destination container addresses. The data leaving the containers is encapsulated with VXLAN information and transferred over the VXLAN tunnels to be de-encapsulated by the peer VTEP.
 
 ### CNI
 A CNI plugin is responsible for associating a network interface to the container network namespace and making any necessary changes to the host. It then assigns the IP to the interface and sets up the routes for it
 
-![alt text](image-101.png)
+![alt text](images/image-101.png)
 
 There are several open source projects that implement CNI plugins with various features and functionality.
 - Cilium
@@ -458,7 +458,7 @@ By default, the traffic forwarded by the bridge does not go through an iptables 
 brd-> broadcast address
 
 
-![alt text](image-103.png)
+![alt text](images/image-103.png)
 
 
 ```sh
@@ -503,7 +503,7 @@ if we ping `netns2` from `netn1`, on ingress, the untagged frame gets a vlan id 
 
 
 `bridge vlan del vid 1 dev veth1`
-![alt text](image-102.png)
+![alt text](images/image-102.png)
 
 Each switch port represents a single collision domain
 If two switches are connected together, it becomes a larger broadcast domain called vlan. A broadcast on this segment, every device that is connected to the switch will also receive the broadcast, this includes also any other switch that is attached and every device that is attached to those switches

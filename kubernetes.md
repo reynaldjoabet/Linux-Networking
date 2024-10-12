@@ -5,7 +5,7 @@ IP addresses are assigned to network interfaces. A typical interface may have on
 
  Bridges allow pods, with their individual network interfaces, to interact with the broader network via the node’s network interface.
 
- ![alt text](image-88.png)
+ ![alt text](images/image-88.png)
 
  The veth device is a local Ethernet tunnel. Veth devices are created in pairs
 
@@ -51,7 +51,7 @@ Triggers when any packet (regardless of origin) is leaving the machine.
 
 ```
 
-![alt text](image-89.png)
+![alt text](images/image-89.png)
 
 
 We can infer from our flow diagram that only certain permutations of Netfilter hook calls are possible for any given packet. For example, a packet originating from a local process will always trigger `NF_IP_LOCAL_OUT` hooks and then `NF_IP_POST_ROUTING` hooks. In particular, the flow of Netfilter hooks for a packet depends on two things: if the packet source is the host and if the packet destination is the host. Note that if a process sends a packet destined for the same host, it triggers the `NF_IP_LOCAL_OUT` and then the `NF_IP_POST_ROUTING` hooks before “reentering” the system and triggering the `NF_IP_PRE_ROUTING` and `NF_IP_LOCAL_IN` hooks.
@@ -79,7 +79,7 @@ Conntrack identifies connections by a tuple, composed of source address, source 
 
 Conntrack stores flows in a hash table,using the connection tuple as a key
 
-![alt text](image-90.png)
+![alt text](images/image-90.png)
 
 ```sh
 #Conntrack’s max size
@@ -121,7 +121,7 @@ Linux prefers to route packets by specificity (how “small” a matching subnet
 10.0.0.0/24 smaller than 0.0.0.0 with only host bits
 
 
-![alt text](image-91.png)
+![alt text](images/image-91.png)
 Cilium (a kube-proxy alternative)
 
 a table contains chains, and a chain contains rules.
@@ -134,7 +134,7 @@ The order of execution is chains, then tables. So, for example, a packet will tr
 
 iptables chains are a list of rules. When a packet triggers or passes through a chain, each rule is sequentially evaluated, until the packet matches a “terminating target” (such as DROP), or the packet reaches the end of the chain.
 
-![alt text](image-92.png)
+![alt text](images/image-92.png)
 
  DNAT can be performed in `PREROUTING` or `OUTPUT`, and SNAT can be performed in only `INPUT` or `POSTROUTING`.
 

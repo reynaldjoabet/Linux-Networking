@@ -76,18 +76,18 @@ Iptables is used to set up, maintain, and inspect the tables of IP packet filter
 
 Each chain is a list of rules which can match a set of packets. Each rule specifies what to do with a packet that matches. This is called a 'target', which may be a jump to a user-defined chain in the same table.
 
-![alt text](image-15.png)
-![alt text](image-16.png)
-![alt text](image-17.png)
-![alt text](image-18.png)
-![alt text](image-19.png)
-![alt text](image-20.png)
-![alt text](image-21.png)
-![alt text](image-22.png)
-![alt text](image-23.png)
-![alt text](image-24.png)
-![alt text](image-25.png)
-![alt text](image-26.png)
+![alt text](images/image-15.png)
+![alt text](images/image-16.png)
+![alt text](images/image-17.png)
+![alt text](images/image-18.png)
+![alt text](images/image-19.png)
+![alt text](images/image-20.png)
+![alt text](images/image-21.png)
+![alt text](images/image-22.png)
+![alt text](images/image-23.png)
+![alt text](images/image-24.png)
+![alt text](images/image-25.png)
+![alt text](images/image-26.png)
 
 
 On Linux, Docker creates `iptables` and `ip6tables` rules to implement network isolation, port publishing and filtering.
@@ -119,14 +119,14 @@ If you want your system to function as a router, you must add explicit `ACCEPT` 
 
 `iptables -I DOCKER-USER -i src_if -o dst_if -j ACCEPT`
 
-![alt text](image-27.png)
+![alt text](images/image-27.png)
 Nat table
 
 When packets arrive to the `DOCKER-USER` chain, they have already passed through a Destination Network Address Translation (DNAT) filter. That means that the iptables flags you use can only match internal IP addresses and ports of containers.
 
 For example, `docker run -p 8080:80 [...] ` creates a mapping between port `8080` on any address on the Docker host, and the container's port `80`. Outgoing connections from the container will masquerade, using the Docker host's IP address
 
-![alt text](image-28.png)
+![alt text](images/image-28.png)
 
 
 network adapater /interface connects a device to a network
@@ -223,7 +223,7 @@ TCP threeway handshake for http
 
 When you create a network bridge and assign it an IP address, the bridge effectively becomes a network interface on the host system. This IP address can be used by the host to route traffic to and from the bridge network and to communicate with any connected devices, such as containers.
 
-![alt text](image-29.png)
+![alt text](images/image-29.png)
 
 `sudo ip link add br1 type bridge`
 
@@ -245,7 +245,7 @@ sudo iptables -A INPUT -i br0 -j DROP
 
 ```
 
-![alt text](image-30.png)
+![alt text](images/image-30.png)
 Linux kernel is the core of linux and it is layer 4,3 and 2
 The userspace is layer 5,6 and 7 
 
@@ -478,7 +478,7 @@ Interestingly, the chains in the filter tables always see the packets after the 
 
 When a chain is called, the packet in question will be evaluated against each rule in the chain. Each rule has two components: a matching component and an action component.
 
-![alt text](image-38.png)
+![alt text](images/image-38.png)
 
 [the-architecture-of-iptables-and-netfilter](https://blog.cloudsigma.com/the-architecture-of-iptables-and-netfilter/#:~:text=specified%20firewall%20rules.-,Netfilter%20Hooks,-For%20programs%20to)
 
@@ -491,7 +491,7 @@ iptables -L -v -t mangle
 iptables -L -v -t raw
 iptables -L -v -t security
 ```
-![alt text](image-32.png)
+![alt text](images/image-32.png)
 
 `iptables --policy FORWARD DROP` 
 When I had the above, I could not ping `172.18.0.20` from `172.18.0.10` until I changed it as shown below then it worked
@@ -501,10 +501,10 @@ When I had the above, I could not ping `172.18.0.20` from `172.18.0.10` until I 
 The br-nf code makes bridged IP frames/packets go through the iptables chains. Ebtables filters on the Ethernet layer, while iptables only filters IP packets.
 
 
-![alt text](image-33.png)
+![alt text](images/image-33.png)
 
 
-![alt text](image-34.png)
+![alt text](images/image-34.png)
 
 ```sh
 iptables -- tables nat --append PREROUTING --protocol tcp --dport 80 --jump REDIRECT -- 8080
@@ -559,10 +559,10 @@ Otherwise the frame should possibly be sent onto another side of the bridge. If 
 
 
 
-![alt text](image-37.png)
+![alt text](images/image-37.png)
 
 
-![alt text](image-39.png)
+![alt text](images/image-39.png)
 
 It seems `mangle` can't happen at layer 2
 
@@ -660,9 +660,9 @@ A segment is a layer 2 network
 
 A bridge,is a device that connects two or more network segments and operates at the data link layer (Layer 2) of the OSI (Open Systems Interconnection) model. The purpose of a bridge is to filter and forward frames between different segments based on the destination MAC (Media Access Control) address.
 
-![alt text](image-35.png)
+![alt text](images/image-35.png)
 
-![alt text](image-36.png)
+![alt text](images/image-36.png)
 
 NAT
 
@@ -706,7 +706,7 @@ These sockets can be stream-based or datagram-based. In addition, these sockets 
 ### SSH Tunnel
 One of the more useful features, and not widely known, is the ability to establish tunnels and proxies. This way, we can use an ssh session to connect other remote services that are not visible to us otherwise, like the ones protected by a firewall:
 
-![alt text](image-31.png)
+![alt text](images/image-31.png)
 
 As seen in the picture, a client machine, while opening the ssh session, instructs the SSH server to open tunnels that can work in both directions.
 
@@ -836,13 +836,13 @@ In `iptables`, a chain is a collection of rules applied to incoming or outgoing 
 
 `Input Chain`  applies to packets right before sending them to a local process.The `mangle` and `filter` tables include this chain
 
-![alt text](image-40.png)
-![alt text](image-41.png)
-![alt text](image-42.png)
+![alt text](images/image-40.png)
+![alt text](images/image-41.png)
+![alt text](images/image-42.png)
 
 We can forward packets betweeen interfaces(docker host interface and bridge network)
-![alt text](image-43.png)
-![alt text](image-44.png)
+![alt text](images/image-43.png)
+![alt text](images/image-44.png)
 
 targets: Targets specify where a packet should go. This is decided using either iptables' own targets: `ACCEPT`, `DROP`, or `RETURN`, or it’s extensions’ target which are 39 at the moment and the most popular ones are `DNAT`, `LOG`, `MASQUERADE`, `REJECT`, `SNAT`, `TRACE` and `TTL`. Terminating targets ends rule traversal and the packets will be stopped there, but non-terminating ones touch a packet in some way and the rule traversal will continue afterward.
 
@@ -869,7 +869,7 @@ iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 
 `MASQUERADE is suited best when you need to forward every traffic from a specific interface to be routed through your computer without changing anything inside packet.`
 
-![alt text](image-45.png)
+![alt text](images/image-45.png)
 
 - Each chain is terminated with a target, or next line taken
 - Tables: Group of chains: filter and nat
@@ -981,7 +981,7 @@ When routing data, the router takes care of moving the data from one device to a
 - 172.16.0.0/12 ( Range: 172.16.0.0 – 172.31.255.255 ) – Available IPs: 1,048,574
 - 192.168.0.0/16 ( Range: 192.168.0.0 – 192.168.255.255 ) – Available IPs: 65,534
 
-![alt text](image-46.png)
+![alt text](images/image-46.png)
 `NAT acts as a middleman between the internet and private networks. It works at layer 3 of the OSI model and operates on a router. It enables a private network that uses the non-routable IP addresses to connect with the internet through the translated Public IP. Therefore, it advertises only one IP address for the entire private network to the outside world.`
 
 
@@ -1206,7 +1206,7 @@ Linux Bridge is an SDN (Software Defined Network) that allows you to create brid
 
 A vNIC (Virtual Network Interface Card) is a virtual network interface commonly found in virtual machines.
 
-![alt text](image-47.png)
+![alt text](images/image-47.png)
 
 Allow packets from the internal network to reach the external network.
 ```sh
@@ -1420,7 +1420,7 @@ Connection tracking also plays a crucial role in NAT scenarios. It allows iptabl
 Understanding stateful firewalling and its interaction with the OUTPUT and FORWARD chains is vital for effective network security. By leveraging connection tracking capabilities, we can define rules that adapt dynamically to the context of network connections, improving performance and enhancing security.
 
 
-![alt text](image-48.png)
+![alt text](images/image-48.png)
 
 Some targets are terminating, which means that they decide the matched packet’s fate immediately. The packet won’t be matched against any other rules. The most commonly used terminating targets are:
 
@@ -1451,7 +1451,7 @@ $ sudo docker run -it --name container3 --rm --network ipvlan_l2 --ip=192.168.0.
 
 ```
 
-![alt text](image-49.png)
+![alt text](images/image-49.png)
 
 
 [network-virtualization-ipip](https://www.sobyte.net/post/2022-04/network-virtualization-ipip/)
@@ -1485,7 +1485,7 @@ enum nf_ip_hook_priorities {
 
 When a packet reaches a hook trigger point, all callback functions registered on that hook by different tables are executed sequentially, always in a fixed relative order according to the priority value above.
 
-![alt text](image-50.png)
+![alt text](images/image-50.png)
 [understanding-netfilter-and-iptables](https://www.sobyte.net/post/2022-04/understanding-netfilter-and-iptables/)
 
 [tun](https://www.sobyte.net/post/2022-04/tun-mode/)
@@ -1508,13 +1508,13 @@ When a packet reaches a hook trigger point, all callback functions registered on
 
 [containerd-usage](https://www.sobyte.net/post/2021-09/containerd-usage/)
 
-![alt text](image-51.png)
+![alt text](images/image-51.png)
 
 Routing part in the middle is provided by the built-in capability of the Linux kernel, also known as IP forwarding. Sending a non-zero value to /proc/sys/net/ipv4/ip_forward file activates packet forwarding between different network interfaces, effectively turning a Linux machine into a virtual router.
 
 [laymans-iptables-101](https://iximiuz.com/en/posts/laymans-iptables-101/)
 
-![alt text](image-52.png)
+![alt text](images/image-52.png)
 
 [ssh-tunnels](https://iximiuz.com/en/posts/ssh-tunnels/)
 
@@ -1622,23 +1622,23 @@ it is destination network id
 
 ```
 
-![alt text](image-53.png)
+![alt text](images/image-53.png)
 
 
-![alt text](image-54.png)
+![alt text](images/image-54.png)
 
 
-![alt text](image-55.png)
+![alt text](images/image-55.png)
 
 Any tcp packet that comes to our host from any interface except `docker0` on port `8081`  and destined to any ip address will be DNATed to `172.17.0.3:80`
 
-![alt text](image-56.png)
+![alt text](images/image-56.png)
 
 packets originating from 172.17.0.0/24 subnet and  leave through interfaces except `br-1db5b346829c` will be SNATed
 
-![alt text](image-57.png)
+![alt text](images/image-57.png)
 
-![alt text](image-58.png)
+![alt text](images/image-58.png)
 
 
 
@@ -1724,7 +1724,7 @@ where  OBJECT := { link | fdb | mdb | vlan | vni | monitor }
                     
 ```
 
-![alt text](image-59.png)
+![alt text](images/image-59.png)
 
 `ip -c -br -n namespacename address show`
 
@@ -2239,41 +2239,41 @@ bridge vlan delete - delete a forwarding database entry
 
 These control whether or not packets traversing the bridge are sent to iptables for processing. In the case of using bridges to connect virtual machines to the network, generally such processing is *not* desired, as it results in guest traffic being blocked due to host iptables rules that only account for the host itself, and not for the guests
 
-![alt text](image-62.png)
+![alt text](images/image-62.png)
 
 ### VLAN Tags
 
 Virtual LANs (VLANs) are a networking technology that enables the segmentation of a single physical network into multiple logical networks, providing enhanced network isolation and security. The IEEE 802.1Q standard defines the VLAN tagging protocol, which adds a 4-byte VLAN tag to the Ethernet frame header. This tag includes information such as the VLAN ID, which identifies the specific VLAN to which the frame belongs. VLAN tagging allows network administrators to logically partition a network, isolating broadcast domains and enhancing network scalability. In a data frame, the VLAN tag is inserted into the Ethernet frame between the Source MAC Address and EtherType fields. It plays a crucial role in facilitating the distinction and proper routing of traffic between different VLANs within a network, contributing to efficient network management and improved security by creating distinct broadcast domains within a shared physical infrastructure.
 
-![alt text](image-63.png)
+![alt text](images/image-63.png)
 
 the bridge  scrutinizes destination host MAC addresses and efficiently forwards packets based on VLAN information, ensuring accurate communication between virtual machines on the specified VLAN.
 
 when a package is received by the  bridge, it adds a VLAN tag to the package and forwards to the router, and when router forwards  package to the  bridge again, it strips that tag and forward package to the destination port. 
 
-![alt text](image-64.png)
+![alt text](images/image-64.png)
 When the bridge is created ,it is isolated and not connected to anywhere but the local ip stack. The device can still access the internet via `eth0`
 The created bridge has a single internal port with the same name as the parent bridge(mybridge). This port is also mapped to an interface with the same name mybrige. It is marked as internal to distinguish it from the other ovs ports
-![alt text](image-65.png)
+![alt text](images/image-65.png)
 
 After adding `eth0` to the bridge, it was redirected to connect to the bridge. So an attept to access the internet now would still try to use `eth0` and it will fail
-![alt text](image-69.png)
+![alt text](images/image-69.png)
 
 Now we will attach the `eth0` interface to `mybridge`. Please be aware that you will loose Internet connectivity immediately after this step, so make sure you have an alternative network to reach the physical box or you have direct access to the system’s console. The reason of this is very simple; under normal circumstances the IP stack of the physical host is configured to reach the Internet through `eth0` (by running `route -n` you can see the output interface of the default route). After connecting the `mybridge` to `eth0`, this interface won’t be longer available directly and we will need to update our IP configuration to use mybridge as the Internet facing interface.
-![alt text](image-72.png)
+![alt text](images/image-72.png)
 
-![alt text](image-73.png)
+![alt text](images/image-73.png)
 To address it 
 1. remove the ip config on `eth0`
 2. then make the internal bridge port a DHCP client so its gets an ip address and default gateway
-![alt text](image-74.png)
-![alt text](image-66.png)
+![alt text](images/image-74.png)
+![alt text](images/image-66.png)
 
 
-![alt text](image-67.png)
+![alt text](images/image-67.png)
 
 
-![alt text](image-68.png)
+![alt text](images/image-68.png)
 
 `ip netns exec netns1 bash`
 
@@ -2355,11 +2355,11 @@ main purpose of TUN/TAP driver is tunneling.
 
 Since a VLAN is a layer two (ethernet) construct what that means is that all the ports on the switch will be in the same broadcast domain
 
-![alt text](image-70.png)
+![alt text](images/image-70.png)
 
 The above diagram shows the default set up on an eight port switch with two machines connected. The two machines can ping each other as they are both on the same VLAN and are both in the same IP network (assume a netmask of something like 255.255.255.0)
 
-![alt text](image-71.png)
+![alt text](images/image-71.png)
 
 if there was an appropriately configured PC connected to any port from 2 through 7 then PC 1 could still ping them but PC 2 is not reachable by PC 1. Note that both PC 1 and PC 2 both still have IP addresses in the same subnet but can’t communicate, this clearly shows that VLANs are a layer two construct.
 
@@ -2408,9 +2408,9 @@ The bridge with the lowest priority will be elected as the root bridge. The root
 
  ### Tunneling
 
- ![alt text](image-75.png)
+ ![alt text](images/image-75.png)
 
- ![alt text](image-76.png)
+ ![alt text](images/image-76.png)
 
 
  We can only have one untagged id per port
@@ -2687,7 +2687,7 @@ Data link layer has two sub layers
 
 
 
-![alt text](image-82.png)
+![alt text](images/image-82.png)
 
 A Linux bridge behaves like a network switch. It forwards packets between interfaces that are connected to it. It's usually used for forwarding packets on routers, on gateways, or between VMs and network namespaces on a host. It also supports STP, VLAN filter, and multicast snooping.
 
@@ -2711,7 +2711,7 @@ ip link set veth1 master br0
  POSTROUTING chain in nat table is used for sNAT while that in PREROUTING chain is sued for DNAT
 
 
- ![alt text](image-95.png)
+ ![alt text](images/image-95.png)
 
 
 unshare - run program in new namespaces

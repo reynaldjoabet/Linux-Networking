@@ -153,7 +153,7 @@ TUN/TAP provides packet reception and transmission for user space programs. It c
 
 any packet which is transmitted by
    one end of a link is always received by the other
-![alt text](image-85.png)
+![alt text](images/image-85.png)
 
 ## Broadcast traffic and "chattiness" of the network
 A layer 3 network does not allow broadcast traffic to be passed over it. This is both an advantage and a disadvantage. Some client/server applications rely on the use of broadcast traffic to communicate between the server and the clients. For such applications, a tap-style network is required.

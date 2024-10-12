@@ -1,4 +1,4 @@
-![alt text](image-77.png)
+![alt text](images/image-77.png)
 
 ```sh
 #Incoming Packet to host
@@ -659,7 +659,7 @@ enum ip_conntrack_status {
 
 ### nf_conntrack_in(): enter conntrack
 
-![alt text](image-99.png)
+![alt text](images/image-99.png)
 Conntrack points in Netfilter framework
 
 Protocols that support NAT needs to implement the methods defined in:

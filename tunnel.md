@@ -38,7 +38,7 @@ VXLAN (Data center)
 The outer packet provides routing and addressing information that gets the encapsulated data from point A to point B, much like how a tunnel allows traffic to pass through otherwise inaccessible areas.
 
 
-![alt text](image-94.png)
+![alt text](images/image-94.png)
 
 IPsec site-to-site example setup with VPN gateways r1 and r2
 
