@@ -1,0 +1,1 @@
+[80211-wireless-networks](https://www.oreilly.com/library/view/80211-wireless-networks/0596100523/ch04.html#wireless802dot112-CHP-4-SECT-1)
