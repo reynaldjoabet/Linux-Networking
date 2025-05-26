@@ -668,3 +668,15 @@ Protocols that support NAT needs to implement the methods defined in:
 - struct nf_nat_l4proto {}
 
 `nf_nat_inet_fn(): core of NAT module, will be called at all hooking points except NF_INET_FORWARD.`
+
+
+```sh
+conntrack -L -o id,extended
+...
+ipv4     2 tcp      6 421957 ESTABLISHED src=192.168.0.2 dst=192.168.0.8 sport=34621 dport=22 src=192.168.0.8 dst=192.168.0.2 sport=22 dport=34621 [ASSURED] mark=6 use=1 id=2014938051
+
+```
+
+[](https://gist.github.com/nerdalert/a1687ae4da1cc44a437d)
+
+[](https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks)

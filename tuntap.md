@@ -271,3 +271,66 @@ Granting Your User Administrative Access
 [introduction-to-ocaml](https://baturin.org/blog/introduction-to-ocaml/)
 
 [ocaml-faq](https://baturin.org/docs/ocaml-faq/)
+
+[tuntap](https://www.kernel.org/doc/Documentation/networking/tuntap.txt)
+
+
+[linux-virtual-devices](https://www.sobyte.net/post/2022-10/linux-virtual-devices/)
+
+The TUN/TAP virtual network device is connected to the protocol stack on one end, and not to the physical network on the other end, but to another application in user space. This means that packets sent from the stack to the TUN/TAP can be read by the application, and of course the application can send packets directly to the TUN/TAP.
+
+![alt text](image-25.png)
+```sh
+ip link add veth0 type veth peer name veth1
+ip addr add 20.1.0.10/24 dev veth0
+ip addr add 20.1.0.11/24 dev veth1
+ip link set veth0 up
+ip link set veth1 up
+```
+
+```sh
+
+# ping -c 2 20.1.0.11 -I veth0
+PING 20.1.0.11 (20.1.0.11) from 20.1.0.11 veth0: 28(42) bytes of data.
+64 bytes from 20.1.0.11: icmp_seq=1 ttl=64 time=0.034 ms
+64 bytes from 20.1.0.11: icmp_seq=2 ttl=64 time=0.052 ms
+
+--- 20.1.0.11 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1500ms
+```
+
+
+```sh
+
+# tcpdump -n -i veth1
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on veth1, link-type EN10MB (Ethernet), capture size 458122 bytes
+20:24:12.220002 ARP, Request who-has 20.1.0.11 tell 20.1.0.10, length 28
+20:24:12.220198 ARP, Request who-has 20.1.0.11 tell 20.1.0.10, length 28
+20:24:12.221372 IP 20.1.0.10 > 20.1.0.11: ICMP echo request, id 18174, seq 1, length 64
+20:24:13.222089 IP 20.1.0.10 > 20.1.0.11: ICMP echo request, id 18174, seq 2, length 64
+
+```
+
+You can see that there are only ICMP echo request packets on veth1, but no answer packets. Think about it. veth1 receives the ICMP echo request packet and forwards it to the protocol stack at the other end, but the protocol stack checks the current device list and finds that there is 20.1.0.10 locally, so it constructs an ICMP echo reply packet and forwards it to the lo device.
+
+
+bridge has a protocol stack attached to one end and multiple ports on the other end, and data is forwarded between the ports based on MAC addresses.
+
+```sh
+The bridge can work at either layer 2 (link layer) or layer 3 (IP network layer). By default, it works at layer 2 and can forward Ethernet messages between different hosts on the same subnet; when an IP address is assigned to the bridge, it enables the bridge to work at layer 3
+```
+
+![alt text](image-26.png)
+
+```sh
+# ip link add name br0 type bridge
+# ip link set br0 up
+```
+
+But this creates a bridge with a protocol stack connected to one end and nothing connected to the other ports, so we need to connect other devices to the bridge to have any real functionality.
+
+
+![alt text](image-27.png)
+
+A typical virtual machine network implementation is to connect the NIC in the virtual machine to the br0 of the host through TUN/TAP, when br0 is similar to the physical switch, the packets sent out by the virtual machine first reach br0, and then br0 is handed over to eth0 to send out, so that the packets do not need to go through the host’s stack, which is very efficient.

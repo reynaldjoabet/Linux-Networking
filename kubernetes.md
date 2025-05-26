@@ -212,5 +212,280 @@ Each network interface device must have a unique MAC address within the network,
  - Multicast: Used to allow many but not all of the devices on a LAN to communicate
 
 
+ in kubernetes, pods are the smallest unit of deployment
+
+any service can only have one port
 
 
+each computer of the communication, stores the other's ip address and port. this combination is called a session or endpoint. The client stores the ip address and port number of the server while the server stores the client's ip address and port. Both are called a socket pair or endpoints
+
+
+AM- travels further..longer wavelength
+
+
+FM carries more infomation due to high frequencies
+
+/8 is a single subnet within the entire IPv4 space (/0)
+
+/16 is a single subnet within a /8
+
+/24 is a single subnet within a /16
+
+
+IPv4 is a 32-bit address space.
+
+CIDR notation /N means the first N bits are fixed for network identification, and the rest are for hosts.
+
+Each /8 is one subnet within the larger /0 space.
+
+Each one has `16,777,216` IPs
+
+```sh
+# of subnets = 2^(new prefix - old prefix)
+```
+**How many /8 subnets fit in /0?**
+2^(8 - 0) = 2^8 = 256 subnets
+
+Each one has 16,777,216 IPs
+**How many /16 subnets fit into a /8?**
+2^(16 - 8) = 2^8 = 256 subnets
+
+Each has 65,536 IPs
+
+There are three types of networks in kubernetes
+- node
+- cluster
+-pod
+
+
+When a node is created, the kubelet delegates
+- Creating the container to the container runtime
+- Attaching the container to the  network  to the CNI
+- Mounting volumes to the CSI
+
+On the CNI part
+- Each pode has its own isolated linux network namespace and is attached to a bridge
+
+- The CNI is responsible for creating the bridge,assigning the IP and connecting `veth0` to the `cni0`
+
+
+There is a thunderbolt bridge on mac with 2 2 thunderbolt interfaces
+
+There are 4 in built interfaces on my mac
+- 2 thunderbolt interfaces(type ethernet)
+- one wifi( type wifi)
+- bride0 of type bridge
+
+## What is Thunderbolt Bridge?
+Thunderbolt Bridge is a networking protocol that uses Thunderbolt ports on your Mac to connect to another Mac using a peer-to-peer connection. It’s often used as a way to transfer large amounts of data between two Macs quickly — Thunderbolt’s speedy transfer rates are perfect for that. It’s faster than Wi-Fi and Gigabit Ethernet. It can also be used to share the internet connection on one Mac with another Mac and, with the addition of extra software, to use the display on one Mac as a second display on another Mac.
+
+macOS provides networking API for VMs called 'vmnet.framework':
+https://developer.apple.com/documentation/vmnet
+
+We can provide its support as the new QEMU network backends which
+represent three different vmnet.framework interface usage modes:
+
+  * `vmnet-shared`:
+    allows the guest to communicate with other guests in shared mode and also with external network (Internet) via NAT. Has (macOS-provided)DHCP server; subnet mask and IP range can be configured;
+
+  * `vmnet-host`:
+    allows the guest to communicate with other guests in host mode.
+    By default has enabled DHCP as `vmnet-shared`, but providing
+    network unique id (uuid) can make `vmnet-host` interfaces isolated from each other and also disables DHCP.
+
+  * `vmnet-bridged`:
+    bridges the guest with a physical network interface.
+
+
+[add-dns-record-for-pod](https://www.sobyte.net/post/2021-10/add-dns-record-for-pod/)
+
+```sh
+
+$ ip -n ns1 route
+10.0.1.0/24 dev veth0 proto kernel scope link src 10.0.1.0
+$ ip -n ns2 route
+10.0.2.0/24 dev veth1 proto kernel scope link src 10.0.2.0
+```
+
+
+The routing table of two network namespaces are only the routing entries of their respective IP ranges, and there is no route to other subnets, so of course can not interoperate, to solve is also very simple, you can use the ip route add command to insert a new route entry in the routing table is not it can be.
+
+```sh
+# 更新 veth0 路由表，添加一条通往 10.0.2.0/24 的路由
+$ ip -n ns1 route add 10.0.2.0/24 dev veth0
+
+# 确认发往 10.0.2.0/24 的数据包被路由到 veth0
+$ ip -n ns1 route get 10.0.2.0
+10.0.2.0 dev veth0 src 10.0.1.0
+    cache
+
+# 同样更新 veth1 路由表，添加一条通往 10.0.1.0/24 的路由
+$ ip -n ns2 route add 10.0.1.0/24 dev veth1
+
+# 确认发往 10.0.1.0/24 的数据包被路由到 veth1
+$ ip -n ns2 route get 10.0.1.0
+10.0.1.0 dev veth1 src 10.0.2.0
+
+```
+
+[docker-k8s-network-2](https://www.sobyte.net/post/2022-07/docker-k8s-network-2/)
+
+- inter-container communication.
+- Pod-to-Pod communication.
+- Pod-to-Service communication.
+- Intra-cluster and inter-cluster communication.
+
+
+### Inter-container communication
+Pod is the most basic scheduling unit in Kubernetes, not a Docker container. Pod means pod, and containers can be understood as beans in a pod, and a Pod can contain multiple containers with related relationships. The communication between Pod and Service is also from the Pod level.
+
+
+Containers within the same Pod do not communicate across hosts, they share the same Network Namesapce space and the same Linux protocol stack. So for all kinds of network operations, a Pod can be treated as a separate “host” and the containers inside can access each other’s ports with localhost addresses.
+
+![alt text](image-1.png)
+
+ there is a Pod instance running on the Node, and the containers inside the Pod share the same Network Namespace, so communication between Container 1 and Container 2 is very simple
+
+
+ ### Pod-to-Pod Communication
+
+- Pod-to-Pod communication under the same Node
+- Pod-to-Pod communication under different Nodes
+
+
+#### Inter-Pod communication under the same Node
+Each Pod has a real global IP address, different Pods within the same Node can communicate directly with each other using the other Pod’s IP address, and no other discovery mechanisms such as DNS, Consul or Etcd are required.
+
+![alt text](image-7.png)
+
+Under the same Node, different Pods are connected to the docker0 bridge through the Veth device pair. Pod1, Pod2 and docker0 bridge belong to the same network segment, that is, they can communicate directly with each other
+
+#### Pod-to-Pod communication under different Nodes
+
+Inter-Pod communication under the same Node is easy to understand because it can be achieved directly through the docker0 bridge But how to implement inter-Pod communication under different Nodes is a problem that needs to be studied.
+
+![alt text](image-8.png)
+
+[grpc](https://www.sobyte.net/post/2022-03/understanding-the-gprc-protocol/)
+
+RPC does two things: 
+- one is data encoding, 
+- and the other is request mapping.
+
+`Data encoding, as the name suggests, is the process of converting the requested memory image into a transportable byte stream and sending it to the server, and then converting the received byte stream into a memory image. There are many methods, the common ones are XML, JSON, Protobuf.`
+
+
+```proto
+package demo.hello;
+
+service Greeter {
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}
+```
+
+
+The .proto file above defines a Greeter service with a SayHello method that accepts a HelloRequest message and returns a HelloReply message. How this Greeter is implemented is language-independent, hence the name IDL. gRPC uses Protobuf’s service to describe the RPC interface.
+
+
+```sh
+So the question is, how does gRPC map requests? To answer this question, we must first answer what transport protocol gRPC uses at the bottom. The answer is the HTTP protocol, or to be precise, gRPC uses the HTTP/2 protocol
+```
+
+
+This HTTP request uses the POST method, and the corresponding resource path is determined by the .proto definition. The path for the Greeter service we mentioned earlier is `/demo.hello.Greeter/SayHello`.
+
+A gRPC definition contains three parts, the package name, the service name and the interface name, with the following connection rules.
+
+1. `/{packageName}.{serviceName}/{methodName}`
+
+The package name of SayHello is demo.hello, the service name is Greeter, and the interface name is SayHello, so the corresponding path is `/demo.hello.Greeter/SayHello`.
+
+
+```proto
+
+service Greeter {
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+  rpc SayHello (stream HelloRequest) returns (HelloReply) {}
+  rpc SayHello (HelloRequest) returns (stream HelloReply) {}
+  rpc SayHello (stream HelloRequest) returns (stream HelloReply) {}
+}
+```
+
+gRPC holds three streaming interfaces, defined by prefixing the parameters with the stream keyword: request stream, response stream, and bidirectional stream.
+
+[pb-encoding](https://www.sobyte.net/post/2022-03/pb-encoding/)
+
+
+## HTTP proxy server
+HTTP proxy, there are two types: 
+- one of forward proxy 
+- and one of reverse proxy.
+
+![alt text](image-9.png)
+Nginx currently supports three load balancing policies (polling, weighted polling, IP hashing) and two common third-party policies (fair, url hashing).
+
+[nginx-ssl-test](https://www.sobyte.net/post/2022-04/nginx-ssl-test/)
+
+[prevent-https-from-exposing-the-domain-name-bound-on-the-server](https://www.sobyte.net/post/2022-01/prevent-https-from-exposing-the-domain-name-bound-on-the-server/)
+
+![alt text](image-10.png)
+
+
+
+
+When a packet arrives at a Linux server, it passes through the following steps:
+
+- **PREROUTING Chain**: Determines whether to modify the packet before routing.
+Routing Decision: Decides whether the packet is for the local system or needs to be forwarded.
+- **INPUT Chain** (if destined for the local system): Examines the packet and decides whether to accept or drop it.
+- **OUTPUT Chain** (if generated by the local system): Examines outgoing packets.
+- **FORWARD Chain** (if the packet needs to be routed): Decides whether to forward or drop the packet.
+- **POSTROUTING Chain**: Modifies the packet after routing.
+
+
+```iptables
+# Flush existing rules
+iptables -F
+
+# Set default policies
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT ACCEPT
+
+# Allow incoming SSH and HTTP traffic
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+
+# Allow loopback traffic
+iptables -A INPUT -i lo -j ACCEPT
+
+# Allow established and related traffic
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+```
+
+- Order of Rules: Rules are processed from top to bottom. The first match determines the action.
+- Default Policies: It's a good practice to set default policies to DROP and explicitly allow traffic.
+
+when you start docker on mac, you see two new interfaces `vmenet0` and `bridge100` with `vmenet0` being a member of the bridge
+
+
+![alt text](image-11.png)
+
+![alt text](image-12.png)
+
+[k8s-net](https://www.sobyte.net/post/2022-10/k8s-net/)
+
+
+[k8s-service](https://www.sobyte.net/post/2022-09/k8s-service/)
+
+[master-kubernetes-services-a-complete-guide-with-examples](https://medium.tuanh.net/master-kubernetes-services-a-complete-guide-with-examples-9a6fdcfd97a7)
+
+[kubernetes-quickstart](https://jasoneckert.github.io/myblog/kubernetes-quickstart/)

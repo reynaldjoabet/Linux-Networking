@@ -1829,3 +1829,705 @@ Since the frame is addressed to the bridge’s MAC address, the frame is handed 
 Default Gateway: The bridge may act as the default gateway for containers to access external networks.
 
 Routing Role: The bridge's IP address (e.g., 192.168.1.1) is used as a default gateway, while the MAC address ensures frames are routed correctly
+
+
+
+[]
+
+
+Frames travel over wire or air(wifi) to reach your machine.The device driver of the network card grabs th frames and passes them to the kernel.
+
+- Once the frame hits the kernel, is enters the network stack.
+- The network stack extracts the `MAC` address and checks if it is meant for this machine.
+- If meant for this device, the network stack removes the unnecessary part of the frame( like MAC address)
+- it then sends the leftovers to another part of the network stack
+- leftover is called packet
+
+
+
+```sh
+listeners=INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094
+listener.security.protocol.map=INTERNAL:PLAINTEXT,EXTERNAL:SSL
+advertised.listeners=INTERNAL://kafka.internal.local:9092,EXTERNAL://broker.yourdomain.com:9094
+```
+
+- 0.0.0.0 means Kafka listens on all interfaces.
+
+- advertised.listeners tells clients how to connect to the broker (DNS names are important here)
+
+- Internal apps use the internal DNS (kafka.internal.local), while external clients use something public like broker.yourdomain.com
+
+- bootstrap.servers=broker.yourdomain.com:9094
+
+`nat` table before containers are started
+![alt text](image-2.png)
+
+`docker-compose` with just internal interface
+
+```sh
+services:
+  controller-1:
+    image: apache/kafka:latest
+    container_name: controller-1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: controller
+      KAFKA_LISTENERS: CONTROLLER://:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  broker-1:
+    image: apache/kafka:latest
+    container_name: broker-1
+    ports:
+      - 29092:9092
+    environment:
+      KAFKA_NODE_ID: 4
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: 'PLAINTEXT://:19092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker-1:19092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    depends_on:
+      - controller-1
+ 
+  broker-2:
+    image: apache/kafka:latest
+    container_name: broker-2
+    ports:
+      - 39092:9092
+    environment:
+      KAFKA_NODE_ID: 5
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: 'PLAINTEXT://:19092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker-2:19092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    depends_on:
+      - controller-1
+  
+```
+![alt text](image-4.png)
+
+
+![alt text](image-5.png)
+
+`docker-compose` with just internal interface and no ports forwarded
+ it is port forwarding that creates the DNAT rules we see above
+
+```sh
+services:
+  controller-1:
+    image: apache/kafka:latest
+    container_name: controller-1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: controller
+      KAFKA_LISTENERS: CONTROLLER://:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  broker-1:
+    image: apache/kafka:latest
+    container_name: broker-1
+    environment:
+      KAFKA_NODE_ID: 4
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: 'PLAINTEXT://:19092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker-1:19092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    depends_on:
+      - controller-1
+ 
+  broker-2:
+    image: apache/kafka:latest
+    container_name: broker-2
+    environment:
+      KAFKA_NODE_ID: 5
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: 'PLAINTEXT://:19092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker-2:19092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    depends_on:
+      - controller-1
+
+```
+
+![alt text](image-6.png)
+
+`docker-compose` with external interface
+```sh
+services:
+  controller-1:
+    image: apache/kafka:latest
+    container_name: controller-1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: controller
+      KAFKA_LISTENERS: CONTROLLER://:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  broker-1:
+    image: apache/kafka:latest
+    container_name: broker-1
+    ports:
+      - 29092:9092
+    environment:
+      KAFKA_NODE_ID: 4
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: 'PLAINTEXT://:19092,PLAINTEXT_HOST://:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker-1:19092,PLAINTEXT_HOST://localhost:29092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    depends_on:
+      - controller-1
+ 
+  broker-2:
+    image: apache/kafka:latest
+    container_name: broker-2
+    ports:
+      - 39092:9092
+    environment:
+      KAFKA_NODE_ID: 5
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: 'PLAINTEXT://:19092,PLAINTEXT_HOST://:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://broker-2:19092,PLAINTEXT_HOST://localhost:39092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@controller-1:9093
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    depends_on:
+      - controller-1
+  
+```
+
+![alt text](image-3.png)
+
+- The MASQUERADE target is used in the POSTROUTING chain of the NAT table to modify outgoing packets' source IP addresses(SNAT)
+- DNAT (Destination Network Address Translation) is used in the PREROUTING chain of the NAT table. It is used to modify the destination IP address of incoming packets.
+
+`PREROUTING`:
+The PREROUTING chain is used to modify packets before routing decisions are made. In this case, the only rule in the PREROUTING chain is related to Docker
+
+`POSTROUTING Chain`
+The POSTROUTING chain is used for modifying packets just before they leave the system
+
+```sh
+Chain POSTROUTING (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 MASQUERADE  all  --  *      !br-9b85f3584280  172.18.0.0/16        0.0.0.0/0           
+    0     0 MASQUERADE  all  --  *      !docker0  172.17.0.0/16        0.0.0.0/0           
+    0     0 MASQUERADE  tcp  --  *      *       172.18.0.3           172.18.0.3           tcp dpt:9092
+    0     0 MASQUERADE  tcp  --  *      *       172.18.0.4           172.18.0.4           tcp dpt:9092
+
+
+```
+
+1. MASQUERADE: This changes the source IP address of packets coming from the `172.18.0.0/16` network to the public IP address of the outgoing interface (except for the br-9b85f3584280 interface, which is a Docker bridge)
+
+- `!br-9b85f3584280`: Excludes the packets coming from the br-9b85f3584280 interface from being masqueraded.
+
+For traffic that's part of the Docker internal network (i.e., traffic going to or coming from containers within br-9b85f3584280), source NAT (masquerading) isn't required.
+2. Similar to the first rule but for the 172.17.0.0/16 network, masquerading packets from the Docker network.
+
+
+```sh
+Chain DOCKER (2 references)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 RETURN     all  --  br-9b85f3584280 *       0.0.0.0/0            0.0.0.0/0           
+    0     0 RETURN     all  --  docker0 *       0.0.0.0/0            0.0.0.0/0           
+    0     0 DNAT       tcp  --  !br-9b85f3584280 *       0.0.0.0/0            0.0.0.0/0            tcp dpt:39092 to:172.18.0.3:9092
+    0     0 DNAT       tcp  --  !br-9b85f3584280 *       0.0.0.0/0            0.0.0.0/0            tcp dpt:29092 to:172.18.0.4:9092
+```
+
+First DNAT rule
+
+- This rule forwards incoming TCP traffic on port 39092 to the container 172.18.0.3 on port 9092.
+
+Second DNAT rule:
+- This rule forwards incoming TCP traffic on port 29092 to the container 172.18.0.4 on port 9092
+
+
+`metals` requires either an SBT project, a Mill project, or a running Bloop
+server.
+
+
+The client creates a socket and initiates a connection to the server's ip and port. if using tcp, this initiates a 3 way handshake.
+once connected, the client write to and read from the socket just like working with a file
+
+ Every socket is uniquely identified by a 5 tuple
+ - type of socket: tcp or udp
+ - local port
+ - local ip address
+ - peer's port( optional for udp)
+ peer's ip address( optional for udp)
+
+ 10.0.0.0 to 10.255.255.255
+
+ 172.16.0.0 to 172.31.255.255
+
+ 192.168.0.0 to 192.168.255.255
+
+
+```sh
+# DNAT rule in PREROUTING
+iptables -t nat -A PREROUTING -p tcp --dport 8080 \
+  -j DNAT --to-destination 192.168.1.100:80
+
+# SNAT rule in POSTROUTING
+iptables -t nat -A POSTROUTING -o eth0 \
+  -j SNAT --to-source 203.0.113.5
+
+```
+
+![alt text](image-30.png)
+
+One nat table, many chains:
+
+- PREROUTING & OUTPUT → Destination NAT
+
+- POSTROUTING → Source NAT
+
+The kernel consults its routing table, which contains rules like:
+```sh
+Destination         Gateway         Interface
+0.0.0.0/0           192.168.1.1     eth0         ← default route (used if nothing else matches)
+10.0.0.0/24         0.0.0.0         eth1         ← direct delivery on eth1
+192.168.1.0/24      0.0.0.0         eth0         ← direct delivery on eth0
+```
+
+Creating a custom chain
+```sh
+sudo iptables -N MYCHAIN
+```
+
+You can now add rules to MYCHAIN like so:
+
+```
+sudo iptables -A MYCHAIN -s 10.0.0.5 -j DROP
+
+```
+
+5 primary hooks
+```c
+enum nf_inet_hooks {
+    NF_INET_PRE_ROUTING,   // 0
+    NF_INET_LOCAL_IN,      // 1
+    NF_INET_FORWARD,       // 2
+    NF_INET_LOCAL_OUT,     // 3
+    NF_INET_POST_ROUTING,  // 4
+    NF_INET_NUMHOOKS,      // 5 (count)
+    NF_INET_INGRESS = NF_INET_NUMHOOKS, // 5: new hook
+};
+
+
+enum nf_dev_hooks {
+	NF_NETDEV_INGRESS,
+	NF_NETDEV_EGRESS,
+	NF_NETDEV_NUMHOOKS
+}
+
+/* Bridge Hooks */
+/* After promisc drops, checksum checks. */
+#define NF_BR_PRE_ROUTING	0
+/* If the packet is destined for this box. */
+#define NF_BR_LOCAL_IN		1
+/* If the packet is destined for another interface. */
+#define NF_BR_FORWARD		2
+/* Packets coming from a local process. */
+#define NF_BR_LOCAL_OUT		3
+/* Packets about to hit the wire. */
+#define NF_BR_POST_ROUTING	4
+/* Not really a hook, but used for the ebtables broute table */
+#define NF_BR_BROUTING		5
+#define NF_BR_NUMHOOKS		6
+
+enum nf_br_hook_priorities {
+	NF_BR_PRI_FIRST = INT_MIN,
+	NF_BR_PRI_NAT_DST_BRIDGED = -300,
+	NF_BR_PRI_FILTER_BRIDGED = -200,
+	NF_BR_PRI_BRNF = 0,
+	NF_BR_PRI_NAT_DST_OTHER = 100,
+	NF_BR_PRI_FILTER_OTHER = 200,
+	NF_BR_PRI_NAT_SRC = 300,
+	NF_BR_PRI_LAST = INT_MAX,
+};
+```
+
+ for a packet destined for the local machine, there are only two Netfilter hooks involved in its path
+- PREROUTING
+- INPUT(LOCAL_IN)
+ ![alt text](image-31.png)
+
+
+ Decide whether to allow, deny, or drop a packet.
+
+Chains that drop:
+
+- INPUT (drop incoming packets to the host)
+- FORWARD (drop packets being routed)
+- OUTPUT (drop packets generated by the host)
+
+Hook	Chain	Description
+NF_INET_LOCAL_IN	INPUT	For packets destined for the local system
+NF_INET_FORWARD	FORWARD	For packets being routed through the system
+NF_INET_LOCAL_OUT	OUTPUT	For packets originating from the local system
+
+
+A packet hits a Netfilter hook during its journey through the kernel. `That hook activates tables`, which contain chains, which contain rules.
+
+![alt text](image-32.png)
+
+```sh
+ Targets specify where a packet should go. This is decided using either iptables' own targets: ACCEPT, DROP, or RETURN, or it’s extensions’ target which are 39 at the moment and the most popular ones are DNAT, LOG, MASQUERADE, REJECT, SNAT, TRACE and TTL. Targets are divided into terminating and non-terminating. Which is just what the name suggests. Terminating targets ends rule traversal and the packets will be stopped there, but non-terminating ones touch a packet in some way and the rule traversal will continue afterward.
+ ```
+
+ connection tracking (conntrack) is invoked in only two Netfilter hooks.Checks if the packet belongs to an existing connection, or creates a new conntrack entry
+ - PREROUTING :Any packet entering the system, whether it's:
+    **Destined for the local host (INPUT)**
+    **Routed elsewhere (FORWARD)**
+    
+ - OUTPUT
+
+
+Even though conntrack is invoked only at:
+- PREROUTING (for incoming packets)
+- OUTPUT (for locally generated packets)
+The conntrack state (e.g., NEW, ESTABLISHED, RELATED) is available and used in all hooks 
+```sh
+iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+```
+
+This rule uses the already-determined state from PREROUTING.
+- Conntrack logic runs only at PREROUTING (incoming) and OUTPUT (outgoing).
+- Conntrack state is cached and available in all hooks/chains afterward.
+
+Let’s say your Linux box is acting as a router or gateway between two networks
+
+```sh
+      [Internet] eth0         eth1 [LAN]
+          ───────▶  Linux  ───────▶
+                (forwarding)
+```
+
+```sh
+1. 🛬 Packet enters on interface eth0
+          ↓
+2. 🔗 [PREROUTING] Hook (raw, mangle, nat tables)
+   - Conntrack runs (track NEW/ESTABLISHED)
+   - DNAT may occur here (change destination IP)
+          ↓
+3. 📍 Routing decision (is it for me?)
+   - ❌ No → Route to another interface (e.g. eth1)
+          ↓
+4. 🔁 [FORWARD] Hook (mangle, filter, security tables)
+   - `iptables -A FORWARD ...` rules apply here
+   - Use `-m conntrack --ctstate` to match
+          ↓
+5. 🔚 [POSTROUTING] Hook (mangle, nat tables)
+   - SNAT (e.g., replace source IP with eth0 IP)
+          ↓
+6. 🛫 Packet is sent out via eth1
+```
+
+
+### Netfilter Hooks
+
+There are five netfilter hooks that programs can register with. As packets progress through the stack, they will trigger the kernel modules that have registered with these hooks. The hooks that a packet will trigger depends on whether the packet is incoming or outgoing, the packet’s destination, and whether the packet was dropped or rejected at a previous point.
+
+
+The following hooks represent these well-defined points in the networking stack:
+
+- `NF_IP_PRE_ROUTING`: This hook will be triggered by any incoming traffic very soon after entering the network stack. This hook is processed before any routing decisions have been made regarding where to send the packet.
+- `NF_IP_LOCAL_IN`: This hook is triggered after an incoming packet has been routed if the packet is destined for the local system.
+- `NF_IP_FORWARD`: This hook is triggered after an incoming packet has been routed if the packet is to be forwarded to another host.
+- `NF_IP_LOCAL_OUT`: This hook is triggered by any locally created outbound traffic as soon as it hits the network stack.
+- `NF_IP_POST_ROUTING`: This hook is triggered by any outgoing or forwarded traffic after routing has taken place and just before being sent out on the wire.
+
+Kernel modules that need to register at these hooks must also provide a priority number to help determine the order in which they will be called when the hook is triggered. This provides the means for multiple modules (or multiple instances of the same module) to be connected to each of the hooks with deterministic ordering. Each module will be called in turn and will return a decision to the `netfilter` framework after processing that indicates what should be done with the packet.
+
+## IPTables Tables and Chains
+
+The `iptables` firewall uses tables to organize its rules. These tables classify rules according to the type of decisions they are used to make. For instance, if a rule deals with network address translation, it will be put into the nat table. If the rule is used to decide whether to allow the packet to continue to its destination, it would probably be added to the `filter`table.
+
+Within each `iptables` table, rules are further organized within separate “chains”. While tables are defined by the general aim of the rules they hold, the built-in chains represent the `netfilter hooks which trigger them`. Chains determine when rules will be evaluated.
+
+`The names of the built-in chains mirror the names of the netfilter hooks they are associated with`:
+
+- `PREROUTING`: Triggered by the NF_IP_PRE_ROUTING hook.
+- `INPUT`: Triggered by the NF_IP_LOCAL_IN hook.
+- `FORWARD`: Triggered by the NF_IP_FORWARD hook.
+- `OUTPUT`: Triggered by the NF_IP_LOCAL_OUT hook.
+- `POSTROUTING`: Triggered by the NF_IP_POST_ROUTING hook.
+
+Each chain corresponds to a netfilter hook (internal kernel points where packets pass through).
+
+when packet just entered the stack,it hits `NF_IP_PRE_ROUTING` hooks,which triggers `PREROUTING` chain
+
+Kernel immediately triggers the `NF_IP_PRE_ROUTING` hook
+This activates the PREROUTING chain in tables like:
+- raw (first)
+- mangle
+- nat (last)
+
+If you're dealing with `bridged traffic`, packets might hit `bridge hooks` first (via ebtables or NF_BR_*), and then be passed to iptables if `br_netfilter` is enabled.
+
+A hook fires, and it looks for chains in the tables that implement that hook.
+The kernel looks in each table that supports that hook, in a predefined order, and runs the chain for that hook in each table.
+
+```sh
+[Packet]
+   ↓
+[Hook: PRE_ROUTING]
+   ↓
+raw:PREROUTING  →  mangle:PREROUTING  →  nat:PREROUTING
+```
+
+When a hook fires, iptables runs all chains tied to that hook, in all relevant tables
+
+Each built-in chain is tied to one specific hook.
+- `PREROUTING` → tied to `NF_IP_PRE_ROUTING`
+- `INPUT` → tied to `NF_IP_LOCAL_IN`
+- `FORWARD` → tied to `NF_IP_FORWARD`
+- `OUTPUT` → tied to `NF_IP_LOCAL_OUT`
+- `POSTROUTING` → tied to `NF_IP_POST_ROUTING`
+
+hooks trigger chains,which are evaluated in the tables they belong
+Hooks are fixed points in the packet’s journey through the Linux kernel.
+When a hook is triggered, the kernel evaluates the chains attached to that hook — but only those chains in tables that define it.
+
+
+Chains allow the administrator to control where in a packet’s delivery path a rule will be evaluated. Since each table has multiple chains, a table’s influence can be exerted at multiple points in processing. Because certain types of decisions only make sense at certain points in the network stack, every table will not have a chain registered with each kernel hook.
+
+There are only five `netfilter` kernel hooks, so chains from multiple tables are registered at each of the hooks. For instance, three tables have `PREROUTING` chains. When these chains register at the associated `NF_IP_PRE_ROUTING` hook, they specify a priority that dictates what order each table’s `PREROUTING` chain is called. Each of the rules inside the highest priority `PREROUTING` chain is evaluated sequentially before moving onto the next `PREROUTING` chain. We will take a look at the specific order of each chain in a moment.
+
+
+### The Raw Table
+
+The `iptables` firewall is stateful, meaning that packets are evaluated in regards to their relation to previous packets. The connection tracking features built on top of the `netfilter` framework allow `iptables` to view packets as part of an ongoing connection or session instead of as a stream of discrete, unrelated packets. The connection tracking logic is usually applied very soon after the packet hits the network interface.
+
+The `raw` table has a very narrowly defined function. Its only purpose is to provide a mechanism for marking packets in order to opt-out of connection tracking.
+
+[a-deep-dive-into-iptables-and-netfilter-architecture](https://www.digitalocean.com/community/tutorials/a-deep-dive-into-iptables-and-netfilter-architecture)
+
+Chain Traversal Order
+
+Assuming that the server knows how to route a packet and that the firewall rules permit its transmission, the following flows represent the paths that will be traversed in different situations:
+
+- Incoming packets destined for the local system: PREROUTING -> INPUT
+- Incoming packets destined to another host: PREROUTING -> FORWARD -> POSTROUTING
+- Locally generated packets: OUTPUT -> POSTROUTING
+
+If we combine the above information with the ordering laid out in the previous table, we can see that an incoming packet destined for the local system will first be evaluated against the `PREROUTING` chains of the `raw, mangle, and nat` tables. It will then traverse the `INPUT` chains of the `mangle, filter, security, and nat` tables before finally being delivered to the local socket.
+
+
+### IPTables Rules
+
+Rules are placed within a specific chain of a specific table. As each chain is called, the packet in question will be checked against each rule within the chain in order. Each rule has a matching component and an action component.
+Matching
+
+The matching portion of a rule specifies the criteria that a packet must meet in order for the associated action (or “target”) to be executed.
+
+
+## Targets
+A “target” refers to the actions that are triggered when a packet meets the matching criteria of a rule. Targets are generally divided into two categories:
+
+- Terminating targets: Terminating targets perform an action which terminates evaluation within the chain and returns control to the netfilter hook. Depending on the return value provided, the hook might drop the packet or allow the packet to continue to the next stage of processing.
+- Non-terminating targets: Non-terminating targets perform an action and continue evaluation within the chain. Although each chain must eventually pass back a final terminating decision, any number of non-terminating targets can be executed beforehand.
+
+
+## Jumping to User-Defined Chains
+
+There is also a special class of non-terminating target: the jump target. Jump targets are actions that result in evaluation moving to a different chain for additional processing. We’ve covered the built-in chains which are tied to the netfilter hooks that call them. However, iptables also allows administrators to create their own chains for organizational purposes.
+
+Rules can be placed in user-defined chains in the same way that they can be placed into built-in chains. The difference is that user-defined chains can only be reached by “jumping” to them from a rule (they are not registered with a netfilter hook themselves).
+
+- SNAT: This is a virtual state set when the source address has been altered by NAT operations. This is used by the connection tracking system so that it knows to change the source addresses back in reply packets.
+- DNAT: This is a virtual state set when the destination address has been altered by NAT operations. This is used by the connection tracking system so that it knows to change the destination address back when routing reply packets.
+
+```sh
+iptables -t nat -A PREROUTING -d 203.0.113.5 -p tcp --dport 80 \
+         -j DNAT --to-destination 192.168.1.10:80
+
+```
+
+When the packet comes in:
+- Destination IP is changed to 192.168.1.10
+- conntrack tags the connection with DNAT
+- Automatically applies reverse DNAT for reply packets (from 192.168.1.10 → 203.0.113.5)
+
+```sh
+iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source 198.51.100.99
+
+```
+
+- Source IP is changed to 198.51.100.99
+- conntrack tags the connection with SNAT
+- Conntrack remembers this and Automatically reverts the source IP on return traffic
+
+### Virtual State Use
+
+These are not packet states like NEW, ESTABLISHED, etc., but are instead annotations stored in the conntrack entry so the kernel knows how to transform packets during:
+- Outbound traffic: apply NAT
+- Inbound replies: reverse NAT
+
+ DNAT is mostly for incoming traffic — like port forwarding and reverse proxying.
+
+ ### Why Not Just Use One?
+
+- If you only SNAT: outside world can't initiate connections to internal hosts.
+- If you only DNAT: replies from your internal servers will have private IPs — remote clients won't know how to respond.
+
+So you need DNAT for ingress and SNAT for egress 
+If internal clients initiate outgoing connections:
+You only need SNAT.
+
+When DNAT is required:
+Only when the connection is initiated from outside and you want to expose internal services (e.g., a web server behind NAT).
+
+![alt text](image-33.png)
+
+
+reverse SNAT does not happen in PREROUTING because at PREROUTING, the routing decision hasn’t been made yet — and reverse SNAT requires knowledge of the packet's direction (local vs forwarded).
+
+
+
+
+
+- A packet arrives to the network interface, passes through the network stack and reaches a user space process.
+
+- A packet is created by a user space process, sent to the network stack, and then delivered to the network interface.
+
+- A packet arrives to the network interface and then in accordance with some routing rules is forwarded to another network interface.
+
+ Sending a non-zero value to `/proc/sys/net/ipv4/ip_forward` file activates packet forwarding between different network interfaces, effectively turning a Linux machine into a virtual router.
+
+```sh
+$ iptables -P INPUT ACCEPT
+# drop all forwards by default
+$ iptables -P FORWARD DROP
+$ iptables -P OUTPUT ACCEPT
+
+# create a new chain
+$ iptables -N DOCKER  # or --new-chain
+
+# if outgoing interface is docker0, jump to DOCKER chain
+$ iptables -A FORWARD -o docker0 -j DOCKER
+
+# add some specific to Docker rules to the user-defined chain
+$ iptables -A DOCKER ...
+$ iptables -A DOCKER ...
+$ iptables -A DOCKER ...
+
+# jump back to the caller (i.e. FORWARD) chain
+$ iptables -A DOCKER -j RETURN
+```
+
+
+![alt text](image-34.png)
+
+[https://www.baeldung.com/linux/iptables-chains-tables-traversal](https://www.baeldung.com/linux/iptables-chains-tables-traversal)
+
+
+![alt text](image-36.png)
+
+![alt text](image-35.png)
+
+SNAT (Source NAT) can be applied in both the OUTPUT and POSTROUTING chains, depending on where the packet originates and what kind of address translation is required
+
+OUTPUT	Locally generated	Packet is generated by the host itself.
+POSTROUTING	All outbound traffic	After routing decision, before leaving the host — applies to all traffic.
+
+SNAT in POSTROUTING Chain : When it's used: For all outbound traffic, whether it's locally generated or forwarded from another machine.
+Classic internet sharing/NAT setup, where internal clients need their source IP changed to the public IP of the gateway.
+
+`iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source 203.0.113.1`
+
+
+![alt text](image-37.png)
+```sh
+Chain 	              Table Processing Order
+PREROUTING 	          Raw | CONNTRACK | Mangle | NAT (DNAT)
+INPUT 	              Mangle | Filter | Security | NAT (SNAT)
+OUTPUT                Raw | CONNTRACK | Mangle | NAT (DNAT) | Filter | Security
+FORWARD 	            Mangle | Filter | Security
+POSTROUTING 	        Mangle | NAT (SNAT)
+```
+
+**To open SSH connection when your computer is a client you have to add two rules in both direction.**
+
+```sh
+iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+```
+
+`-m` is a switch to use iptables’ extension. You can read more about different extensions using `man iptables-extension`. Another example of these extenstions is `limit` which restricts the number of packets to a rule.
+
+
+SSH connections does not happen in one direction only. Instead, you would send a packet to destination port 22, and the packets would come to your computer with the state of `RELATED` and `ESTABLISHED`. Connection tracker distinguishes that for you and you don’t have to worry yourself about it.
+
+**To allow SSH connection when your computer is a server.**
+
+```sh
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+iptables -A OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+```
+
+This is the opposite direction of the previous rule, which opens packets to 22, and send success packets having the state of `RELATED` and `ESTABLISHED` back to the client.
+
+If you want to apply NAT to your iptables, depending on whether you want to apply it to incoming connections or outgoing connection, or whether your computer’s IP address is static or dynamic, you can use the following rules.
+
+```sh
+iptables -t nat -A OUTPUT -p tcp --dport 22 --destination 192.168.40.40 -j DNAT --to-destination 123.123.123.123:4040
+```
+
+[laymans-iptables](https://iximiuz.com/en/posts/laymans-iptables-101/)
+
+
+A packet destined for the local computer according to the bridge (which works on the Ethernet layer) isn't necessarily destined for the local computer according to the IP layer. That's how routing works (MAC destination is the router, IP destination is the actual box you want to communicate with). 
+
+
+There are six hooks defined in the Linux bridging code, of which the `BROUTING` hook was added for ebtables. 
+
+[ebtablesiptables-interaction-on](https://chunchaichang.blogspot.com/2011/01/ebtablesiptables-interaction-on-linux.html)
+
+
+
+
+**There are three types of SSH port forwarding**:
+
+Type	Description	Example Use Case
+- Local forwarding	Forwards a local port to a remote destination via SSH tunnel eg Access a remote database or internal service
+```sh
+ssh -L 8080:localhost:80 user@remote
+#forwards localhost:8080 on your machine to localhost:80 on the remote server.
+```
+- Remote forwarding	Exposes a local service to a remote server via SSH tunnel eg	Make your local dev server accessible from a remote machine
+- Dynamic forwarding	Acts like a SOCKS proxy, routing traffic dynamically via SSH tunnel	Securely browse the internet over SSH
+
+SSH is not only tunneling, but tunneling is one of its key features.

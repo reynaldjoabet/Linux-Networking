@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zk-svc
+  labels:
+    app: zookeeper
+    name: zookeeper
+spec:
+  selector:
+    app: zookeeper
+    name: zookeeper
+  ports:
+    - protocol: TCP
+      port: 2181
+      targetPort: 2181
+      name: tcp-access

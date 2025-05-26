@@ -1,0 +1,438 @@
+version: '3.9'
+
+services:
+  zk-svc:
+    image: confluentinc/cp-zookeeper:7.3.2
+    hostname: zk-svc
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_SERVER_ID: "1"
+      ZOOKEEPER_SERVERS: "server.1=zk-svc:2888:3888"
+    restart: unless-stopped
+
+  kafka-svc:
+    image: confluentinc/cp-kafka:7.3.2
+    hostname: kafka-svc
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+      - "9999:9999"
+      - "1234:1234"
+      - "1235:1235"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-svc:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,DOCKER://host.docker.internal:29092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_ZOOKEEPER_CONNECT: "zk-svc:2181"
+      KAFKA_BROKER_ID: "1"
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_JMX_PORT: "9999"
+      KAFKA_JMX_HOSTNAME: "${DOCKER_HOST_IP:-127.0.0.1}"
+      KAFKA_AUTHORIZER_CLASS_NAME: "kafka.security.authorizer.AclAuthorizer"
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+      EXTRA_ARGS:
+        -javaagent:/usr/share/jmx-exporter/jmx_prometheus_javaagent-0.20.0.jar=1234:/usr/share/jmx-exporter/kafka_broker.yml
+        -javaagent:/usr/share/jmx-exporter/jolokia-jvm-1.7.1.jar=port=1235,host=*
+    volumes:
+      - ./config/kafka/jmx_prometheus_javaagent-0.20.0.jar:/usr/share/jmx-exporter/jmx_prometheus_javaagent-0.20.0.jar
+      - ./config/kafka/jolokia-jvm-1.7.2.jar:/usr/share/jmx-exporter/jolokia-jvm-1.7.1.jar
+      - ./config/kafka/kafka_broker.yml:/usr/share/jmx-exporter/kafka_broker.yml
+    depends_on:
+      - zk-svc
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8080:8080
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'false'
+      KAFKA_CLUSTERS_0_NAME: 'Local K8 Kafka Cluster'
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'kafka-svc:19092'
+      AUTH_TYPE: 'DISABLED'
+    restart: unless-stopped
+
+  redis-svc:
+    image: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  redis-ui:
+    image: rediscommander/redis-commander
+    environment:
+      REDIS_HOSTS: local:redis-svc:6379
+      ADDRESS: 0.0.0.0
+      PORT: 8050
+    ports:
+      - "8050:8050"
+    restart: unless-stopped
+
+#  nginx-svc:
+#    image: nginx
+#    hostname: nginx-svc
+#    ports:
+#      - "80:80"
+#    volumes:
+#      - ./config/nginx/default.conf:/etc/nginx/conf.d/default.conf
+#  #      - ../../ui/static-content:/usr/share/nginx/html
+
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_DB: stocks
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      PGDATA: /data/postgres
+      #    volumes:
+      #      - ~/demand-forecasting/postgres-data:/data/postgres
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    build:
+      context: .
+      shm_size: 256mb
+    shm_size: 512mb
+
+  postgres-ui:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: pgadmin4@pgadmin.org
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_LISTEN_PORT: 5050
+      PGADMIN_SERVER_JSON_FILE: /pgadminconfig/servers.json
+    volumes:
+      - postgres-ui:/root/.pgadmin
+      - ./config/postgres:/pgadminconfig
+    ports:
+      - "5050:5050"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus
+    extra_hosts: [ 'host.docker.internal:host-gateway' ]
+    command:
+      - --enable-feature=exemplar-storage
+      - --web.enable-remote-write-receiver
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus:/tmp/prometheus
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    extra_hosts: [ 'host.docker.internal:host-gateway' ]
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_INSTALL_PLUGINS=redis-datasource,hamedkarbasi93-kafka-datasource
+    volumes:
+      - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./config/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./config/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./config/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo
+    extra_hosts: [ 'host.docker.internal:host-gateway' ]
+    command: [ '-config.file=/etc/tempo.yml' ]
+    volumes:
+      - tempo:/tmp/tempo
+      - ./config/grafana/tempo.yml:/etc/tempo.yml:ro
+    ports:
+      - 3200:3200    # tempo
+      - 9411:9411    # zipkin
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki
+    extra_hosts: [ 'host.docker.internal:host-gateway' ]
+    command: [ '-config.file=/etc/loki/local-config.yaml' ]
+    volumes:
+      - ./config/loki/config.yaml:/etc/loki/local-config.yaml:ro
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.1
+    extra_hosts: [ 'host.docker.internal:host-gateway' ]
+    command: '-v start-dev --import-realm --optimized'
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KEYCLOAK_IMPORT="/opt/jboss/keycloak/imports/realm-export.json -Dkeycloak.profile.feature.upload_scripts=enabled"
+    volumes:
+      - ./config/keycloak/realm-imports:/opt/keycloak/data/import:ro
+    ports:
+      - "9000:8080"
+    restart: unless-stopped
+
+  spring-admin-service:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    ports:
+      - "9800:9800"
+    volumes:
+      - ../../modules/spring-admin/target/:/app/
+    command: 'java -jar /app/distributed-processing-demo-spring-admin-1.0-SNAPSHOT.jar'
+    environment:
+      LOKI_HOST: 'http://loki:3100'
+      SPRING_CLOUD_CONFIG_FAIL_FAST: 'true'
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: 20
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  service-registry:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    ports:
+      - "9900:9900"
+    volumes:
+      - ../../modules/service-registry/target/:/app/
+    command: 'java -jar /app/distributed-processing-demo-service-registry-1.0-SNAPSHOT.jar'
+    environment:
+      LOKI_HOST: 'http://loki:3100'
+      TRACER_HOST: 'http://tempo:9411'
+      SPRING_ADMIN_HOST: 'http://spring-admin-service:9800'
+      SPRING_CLOUD_CONFIG_FAIL_FAST: 'true'
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: 20
+    depends_on:
+      - postgres
+      - spring-admin-service
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    ports:
+      - "9910:9910"
+    volumes:
+      - ../../modules/api-gateway/target/:/app/
+    command: 'java -jar /app/distributed-processing-demo-api-gateway-1.0-SNAPSHOT.jar'
+    environment:
+      LOKI_HOST: 'http://loki:3100'
+      TRACER_HOST: 'http://tempo:9411'
+      KEYCLOAK_HOST: 'http://keycoak:9000'
+      EUREKA_URI: 'http://service-registry:9900/eureka'
+      SPRING_ADMIN_HOST: 'http://spring-admin-service:9800'
+      SPRING_CLOUD_CONFIG_FAIL_FAST: 'true'
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: 20
+    depends_on:
+      - postgres
+      - spring-admin-service
+      - service-registry
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    ports:
+      - "9901:9901"
+    volumes:
+      - ../../modules/auth-service/target/:/app/
+    command: 'java -jar /app/distributed-processing-demo-auth-service-1.0-SNAPSHOT.jar'
+    environment:
+      LOKI_HOST: 'http://loki:3100'
+      TRACER_HOST: 'http://tempo:9411'
+      EUREKA_URI: 'http://service-registry:9900/eureka'
+      SPRING_ADMIN_HOST: 'http://spring-admin-service:9800'
+      INFRA_POSTGRES_HOST: 'postgres'
+      INFRA_POSTGRES_PORT: 5432
+      INFRA_KAFKA_BROKERS: 'kafka-svc:19092'
+      INFRA_REDIS_HOST: 'redis-svc'
+      INFRA_REDIS_PORT: 6379
+      SPRING_CLOUD_CONFIG_FAIL_FAST: 'true'
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: 20
+    depends_on:
+      - postgres
+      - spring-admin-service
+      - service-registry
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    ports:
+      - "9903:9903"
+    volumes:
+      - ../../modules/order-service/target/:/app/
+    command: 'java -jar /app/distributed-processing-demo-order-service-1.0-SNAPSHOT.jar'
+    environment:
+      LOKI_HOST: 'http://loki:3100'
+      TRACER_HOST: 'http://tempo:9411'
+      EUREKA_URI: 'http://service-registry:9900/eureka'
+      SPRING_ADMIN_HOST: 'http://spring-admin-service:9800'
+      INFRA_POSTGRES_HOST: 'postgres'
+      INFRA_POSTGRES_PORT: 5432
+      INFRA_KAFKA_BROKERS: 'kafka-svc:19092'
+      INFRA_REDIS_HOST: 'redis-svc'
+      INFRA_REDIS_PORT: 6379
+      SPRING_CLOUD_CONFIG_FAIL_FAST: 'true'
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: 20
+    depends_on:
+      - postgres
+      - kafka-svc
+      - redis-svc
+      - spring-admin-service
+      - service-registry
+    restart: unless-stopped
+
+  ticker-service:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    ports:
+      - "9902:9902"
+    volumes:
+      - ../../modules/ticker-service/target/:/app/
+    command: 'java -jar /app/distributed-processing-demo-ticker-service-1.0-SNAPSHOT.jar'
+    environment:
+      LOKI_HOST: 'http://loki:3100'
+      TRACER_HOST: 'http://tempo:9411'
+      EUREKA_URI: 'http://service-registry:9900/eureka'
+      SPRING_ADMIN_HOST: 'http://spring-admin-service:9800'
+      INFRA_POSTGRES_HOST: 'postgres'
+      INFRA_POSTGRES_PORT: 5432
+      INFRA_KAFKA_BROKERS: 'kafka-svc:19092'
+      INFRA_REDIS_HOST: 'redis-svc'
+      INFRA_REDIS_PORT: 6379
+      SPRING_CLOUD_CONFIG_FAIL_FAST: 'true'
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: 20
+    depends_on:
+      - postgres
+      - kafka-svc
+      - redis-svc
+      - spring-admin-service
+      - service-registry
+    restart: unless-stopped
+
+  producer-service:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    ports:
+      - "9904:9904"
+    volumes:
+      - ../../modules/producer-service/target/:/app/
+    command: 'java -jar /app/distributed-processing-demo-producer-service-1.0-SNAPSHOT.jar'
+    environment:
+      LOKI_HOST: 'http://loki:3100'
+      TRACER_HOST: 'http://tempo:9411'
+      EUREKA_URI: 'http://service-registry:9900/eureka'
+      SPRING_ADMIN_HOST: 'http://spring-admin-service:9800'
+      INFRA_POSTGRES_HOST: 'postgres'
+      INFRA_POSTGRES_PORT: 5432
+      INFRA_KAFKA_BROKERS: 'kafka-svc:19092'
+      INFRA_REDIS_HOST: 'redis-svc'
+      INFRA_REDIS_PORT: 6379
+      SPRING_CLOUD_CONFIG_FAIL_FAST: 'true'
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: 20
+    depends_on:
+      - postgres
+      - kafka-svc
+      - redis-svc
+      - spring-admin-service
+      - service-registry
+    restart: unless-stopped
+
+  consumer:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    ports:
+      - "9905:9905"
+    volumes:
+      - ../../modules/consumer/target/:/app/
+    command: 'java -jar /app/distributed-processing-demo-consumer-1.0-SNAPSHOT.jar'
+    environment:
+      LOKI_HOST: 'http://loki:3100'
+      TRACER_HOST: 'http://tempo:9411'
+      EUREKA_URI: 'http://service-registry:9900/eureka'
+      SPRING_ADMIN_HOST: 'http://spring-admin-service:9800'
+      INFRA_POSTGRES_HOST: 'postgres'
+      INFRA_POSTGRES_PORT: 5432
+      INFRA_KAFKA_BROKERS: 'kafka-svc:19092'
+      INFRA_REDIS_HOST: 'redis-svc'
+      INFRA_REDIS_PORT: 6379
+      SPRING_CLOUD_CONFIG_FAIL_FAST: 'true'
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: 20
+    depends_on:
+      - postgres
+      - kafka-svc
+      - redis-svc
+      - spring-admin-service
+      - service-registry
+    restart: unless-stopped
+
+  traffic-gen:
+    build:
+      context: ./
+      dockerfile: Java.Dockerfile
+    platform: linux/amd64
+    image: java-17-mvn:1.0.0
+    command: >
+      /bin/bash -c "while true; 
+      do 
+        http GET http://ticker-service:9902/api/instrument/stocks accept:application/json authorization:test access-token:c96cf9ae-a0ce-40ba-91b8-8a636a38a87d; 
+        sleep 0.5; 
+        http GET http://order-service:9903/api/trade/portfolio/1 accept:application/json authorization:test access-token:c96cf9ae-a0ce-40ba-91b8-8a636a38a87d; 
+      done"
+    depends_on:
+      - postgres
+      - kafka-svc
+      - redis-svc
+      - spring-admin-service
+      - service-registry
+      - api-gateway
+      - auth-service
+      - order-service
+      - ticker-service
+
+volumes:
+  postgres:
+  #    driver: local
+  postgres-ui:
+  #    driver: local
+  redis-svc:
+  #    driver: local
+  redis-ui:
+  #    driver: local
+  prometheus:
+  #    driver: local
+  tempo:
+  #    driver: local
